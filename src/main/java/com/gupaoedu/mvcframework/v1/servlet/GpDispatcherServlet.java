@@ -49,8 +49,11 @@ public class GpDispatcherServlet extends HttpServlet {
 
     @Override
     public void init(ServletConfig config) throws ServletException {
+        System.out.println("GP Spring framework start init.");
         // 1 .加载配置文件
-        doLoadConfig(config.getInitParameter("contextConfigLocation"));
+        String contextConfigLocation = config.getInitParameter("contextConfigLocation");
+        LogUtils.info("contextConfigLocation :" + contextConfigLocation);
+        doLoadConfig(contextConfigLocation);
         //2 .扫描相关的类
         doScanner(contextConfig.getProperty("scanPackage"));
         // 3.初始化扫描的类，并且将它们放入到Ioc容器中
@@ -86,6 +89,7 @@ public class GpDispatcherServlet extends HttpServlet {
     private void doScanner(String scanPackage) {
         URL url = this.getClass().getClassLoader().getResource("/" + scanPackage.replaceAll("\\.", "/"));
         File classDir = new File(url.getFile());
+        LogUtils.info("classDir :" + classDir.getPath());
         for (File file : classDir.listFiles()) {
             if (file.isDirectory()) {
                 doScanner(scanPackage + "." + file.getName());
@@ -118,6 +122,8 @@ public class GpDispatcherServlet extends HttpServlet {
                     //Spring 默认类名首字母小写
                     String beanName = toLowerFirstCase(clazz.getSimpleName());
                     ioc.put(beanName, instance);
+                    LogUtils.info("GPController beanName :" + beanName);
+                    // 此时的 A.isAnnotationPresent(B.class)；意思就是：注释B是否在此A上。如果在则返回true；不在则返回false。
                 } else if (clazz.isAnnotationPresent(GPService.class)) {
                     // 1.自定义的beanName
                     GPService service = clazz.getAnnotation(GPService.class);
@@ -127,12 +133,14 @@ public class GpDispatcherServlet extends HttpServlet {
                         beanName = toLowerFirstCase(clazz.getSimpleName());
                     }
                     Object instance = clazz.newInstance();
+                    LogUtils.info("GPService beanName :" + beanName);
                     ioc.put(beanName, instance);
                     //3 根据类型自动赋值，这就是投机取巧的方式
                     for (Class<?> i : clazz.getInterfaces()) {
                         if (ioc.containsKey(i.getName())) {
                             throw new Exception("thie " + i.getName() + " is exit s");
                         }
+                        LogUtils.info("GPService getInterfaces beanName :" + i.getName() + " , class :" + i.getClass().getName());
                         ioc.put(i.getName(), instance);
                     }
                 } else {
@@ -164,9 +172,11 @@ public class GpDispatcherServlet extends HttpServlet {
                     //获取接口的类型，作为key ，稍后用这个key 到IOC容器中取值
                     beanName = field.getType().getName();
                 }
+
                 // 反射中叫做暴力访问
                 field.setAccessible(true);
                 try {
+                    LogUtils.info(" 注入值：  " + entry.getValue().getClass().getName() + " autoired = " + ioc.get(beanName).getClass().getName());
                     field.set(entry.getValue(), ioc.get(beanName));
                 } catch (IllegalAccessException e) {
                     e.printStackTrace();
@@ -184,12 +194,13 @@ public class GpDispatcherServlet extends HttpServlet {
         protected Method method;// 保存映射方法
         protected Pattern pattern;
         protected Map<String, Integer> paramIndexMapping;//参数顺序
+        protected String regex;
 
-
-        protected Handler(Pattern pattern, Object controller, Method method) {
+        protected Handler(Pattern pattern, Object controller, Method method, String regex) {
             this.controller = controller;
             this.method = method;
             this.pattern = pattern;
+            this.regex = regex;
             paramIndexMapping = new HashMap<>();
             putParamIndexMapping(method);
         }
@@ -202,6 +213,7 @@ public class GpDispatcherServlet extends HttpServlet {
                 for (Annotation a : pa[i]) {
                     if (a instanceof GPRequestParam) {
                         String paramName = ((GPRequestParam) a).value();
+                        LogUtils.info("putParamIndexMapping GPRequestParam name :" + paramName);
                         if (!"".equals(paramName.trim())) {
                             paramIndexMapping.put(paramName, i);
                         }
@@ -214,6 +226,7 @@ public class GpDispatcherServlet extends HttpServlet {
                 Class<?> type = paramsTypes[i];
                 if (type == HttpServletRequest.class
                         || type == HttpServletResponse.class) {
+                    LogUtils.info("putParamIndexMapping type name :" + type.getName());
                     paramIndexMapping.put(type.getName(), i);
                 }
             }
@@ -224,21 +237,40 @@ public class GpDispatcherServlet extends HttpServlet {
     private void doDispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         Handler handler = getHandler(req);
         if (handler == null) {
-            resp.getWriter().write("404 not fund");
+            resp.getWriter().write("404 not fundxxxxxxxxx");
             return;
         }
+        LogUtils.info("handler is not null " + handler.controller.getClass().getName() + ",handler method :" + handler.method.getName());
+
         //获取方法参数
         Class<?>[] paramTypes = handler.method.getParameterTypes();
         Object[] paramValues = new Object[paramTypes.length];
         Map<String, String[]> params = req.getParameterMap();
         for (Map.Entry<String, String[]> param : params.entrySet()) {
+            String paramsMap = Arrays.toString(param.getValue());
+            LogUtils.info("paramsMap :" + paramsMap);
             String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll("\\s", ",");
             if (!handler.paramIndexMapping.containsKey(param.getKey())) {
                 continue;
             }
             int index = handler.paramIndexMapping.get(param.getKey());
             paramValues[index] = convert(paramTypes[index], value);
+            LogUtils.info(" params value :" + value + " ,index :" + index);
         }
+        if (handler.paramIndexMapping.containsKey(HttpServletRequest.class.getName())) {
+            int reqIndex = handler.paramIndexMapping.get(HttpServletRequest.class.getName());
+            paramValues[reqIndex] = req;
+        }
+        if (handler.paramIndexMapping.containsKey(HttpServletResponse.class.getName())) {
+            int respIndex = handler.paramIndexMapping.get(HttpServletResponse.class.getName());
+            paramValues[respIndex] = resp;
+        }
+
+        Object returnValue = handler.method.invoke(handler.controller, paramValues);
+        if (returnValue == null || returnValue instanceof Void) {
+            return;
+        }
+        resp.getWriter().write(returnValue.toString());
     }
 
 
@@ -266,8 +298,9 @@ public class GpDispatcherServlet extends HttpServlet {
                 }
                 GPRequestMapping requestMapping = method.getAnnotation(GPRequestMapping.class);
                 String regex = ("/" + url + requestMapping.value()).replaceAll("/+", "/");
+                LogUtils.info("initHandlerMapping regex :" + regex);
                 Pattern pattern = Pattern.compile(regex);
-                handlerMapping.add(new Handler(pattern, entry.getValue(), method));
+                handlerMapping.add(new Handler(pattern, entry.getValue(), method, regex));
                 System.out.println("mapping " + regex + "，" + method);
             }
         }
@@ -280,7 +313,9 @@ public class GpDispatcherServlet extends HttpServlet {
         String url = req.getRequestURI();
         String contextPath = req.getContextPath();
         url = url.replace(contextPath, "").replaceAll("/+", "/");
+        LogUtils.info(" request url :" + url);
         for (Handler handler : handlerMapping) {
+            LogUtils.info(" handler regex :" + handler.regex);
             Matcher matcher = handler.pattern.matcher(url);
             if (!matcher.matches()) {
                 continue;
@@ -289,7 +324,6 @@ public class GpDispatcherServlet extends HttpServlet {
         }
         return null;
     }
-
 
     private Object convert(Class<?> type, String value) {
         if (Integer.class == type) {

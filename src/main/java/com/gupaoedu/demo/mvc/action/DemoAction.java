@@ -1,5 +1,6 @@
 package com.gupaoedu.demo.mvc.action;
 
+import com.design.pattern.utils.LogUtils;
 import com.gupaoedu.demo.service.DemoService;
 import com.gupaoedu.mvcframework.annotation.GPAutowired;
 import com.gupaoedu.mvcframework.annotation.GPController;
@@ -16,9 +17,13 @@ public class DemoAction {
     @GPAutowired
     private DemoService demoService;
 
+
+
+    @GPRequestMapping("/query")
     public void query(HttpServletRequest req, HttpServletResponse resp, @GPRequestParam("name") String name) {
         String result = demoService.get(name);
         try {
+            LogUtils.info(" query name is :" + result);
             resp.getWriter().write(result);
         } catch (IOException e) {
             e.printStackTrace();
