@@ -1,5 +1,6 @@
 package com.gupaoedu.mvcframework.v1.servlet;
 
+import com.design.pattern.utils.LogUtils;
 import com.gupaoedu.mvcframework.annotation.*;
 
 import javax.servlet.ServletConfig;
@@ -93,6 +94,7 @@ public class GpDispatcherServlet extends HttpServlet {
                     continue;
                 }
                 String className = (scanPackage + "." + file.getName().replace(".class", ""));
+                LogUtils.info("doScanner className :" + className);
                 classNames.add(className);
             }
         }
@@ -136,13 +138,11 @@ public class GpDispatcherServlet extends HttpServlet {
                 } else {
                     continue;
                 }
-
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
     private void doAutoired() {
         if (ioc.isEmpty()) {
@@ -229,7 +229,7 @@ public class GpDispatcherServlet extends HttpServlet {
         }
         //获取方法参数
         Class<?>[] paramTypes = handler.method.getParameterTypes();
-        Object[] paramVAlues = new Object[paramTypes.length];
+        Object[] paramValues = new Object[paramTypes.length];
         Map<String, String[]> params = req.getParameterMap();
         for (Map.Entry<String, String[]> param : params.entrySet()) {
             String value = Arrays.toString(param.getValue()).replaceAll("\\[|\\]", "").replaceAll("\\s", ",");
@@ -237,7 +237,7 @@ public class GpDispatcherServlet extends HttpServlet {
                 continue;
             }
             int index = handler.paramIndexMapping.get(param.getKey());
-            paramVAlues[index] = convert(paramTypes[index], value);
+            paramValues[index] = convert(paramTypes[index], value);
         }
     }
 
@@ -246,7 +246,6 @@ public class GpDispatcherServlet extends HttpServlet {
         if (ioc.isEmpty()) {
             return;
         }
-
         for (Map.Entry<String, Object> entry : ioc.entrySet()) {
             Class<?> clazz = entry.getValue().getClass();
             if (!clazz.isAnnotationPresent(GPController.class)) {
