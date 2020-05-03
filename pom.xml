@@ -18,6 +18,13 @@
         </dependency>
 
 
+        <!-- https://mvnrepository.com/artifact/com.google.guava/guava -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>20.0</version>
+        </dependency>
+
 
 
         <dependency>
@@ -75,6 +82,15 @@
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
             <version>5.1.45</version>
+        </dependency>
+
+
+
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>8.1.8.v20121106</version>
         </dependency>
 
     </dependencies>
