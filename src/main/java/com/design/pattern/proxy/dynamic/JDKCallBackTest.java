@@ -11,7 +11,6 @@ public class JDKCallBackTest {
                     return "xxxxxxxxx";
                 }
             });
-
             iCallBackxx.callBack();
         } catch (Exception e) {
             e.printStackTrace();
