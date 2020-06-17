@@ -1,20 +1,20 @@
 package com.design.pattern.proxy.cglib;
 
-import net.sf.cglib.proxy.Callback;
-import net.sf.cglib.proxy.Enhancer;
-import net.sf.cglib.proxy.MethodInterceptor;
-import net.sf.cglib.proxy.MethodProxy;
+import net.sf.cglib.proxy.*;
 
 import java.lang.reflect.Method;
 
 public class CglibMeipo implements MethodInterceptor {
 
-
+    private static final Class<?>[] CALLBACK_TYPES = new Class<?>[]
+            {NoOp.class, LookupOverrideMethodInterceptor.class, ReplaceOverrideMethodInterceptor.class};
 
     public Object getInstance(Class<?> clazz) throws Exception {
         Enhancer enhancer = new Enhancer();
         enhancer.setSuperclass(clazz);
-        enhancer.setCallback(this);
+        enhancer.setCallbacks(new Callback[]{NoOp.INSTANCE,new LookupOverrideMethodInterceptor(),new ReplaceOverrideMethodInterceptor()});
+        enhancer.setCallbackFilter(new MethodOverrideCallbackFilter(1));
+        enhancer.setCallbackTypes(CALLBACK_TYPES);
         return enhancer.create();
     }
 
@@ -28,6 +28,7 @@ public class CglibMeipo implements MethodInterceptor {
         System.out.println("end 如果你觉得好，那就办事了");
         return obj;
     }
+
 
 
 }
